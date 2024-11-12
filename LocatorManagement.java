@@ -2,8 +2,8 @@ package framework.utils;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
-
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class LocatorManager {
@@ -14,51 +14,60 @@ public class LocatorManager {
     public LocatorManager(Page page) {
         this.page = page;
         this.locators = new HashMap<>();
+        generateLocatorsFromDOM();
     }
 
-    // Methods to create locators using various strategies
-    public void addCssLocator(String name, String cssSelector) {
-        locators.put(name, page.locator(cssSelector));
+    // Method to read the DOM and generate locators dynamically
+    private void generateLocatorsFromDOM() {
+        List<Map<String, String>> elements = page.evaluate("() => {\n" +
+                "  const elements = [];\n" +
+                "  document.querySelectorAll('*').forEach(el => {\n" +
+                "    const elementData = {};\n" +
+                "    if (el.id) elementData['css'] = `#${el.id}`;\n" +
+                "    if (el.className) elementData['css'] = `.${el.className.split(' ').join('.')}`;\n" +
+                "    if (el.tagName) elementData['tag'] = el.tagName.toLowerCase();\n" +
+                "    if (el.textContent && el.textContent.trim().length < 30) elementData['text'] = el.textContent.trim();\n" +
+                "    if (el.getAttribute('role')) elementData['role'] = el.getAttribute('role');\n" +
+                "    if (el.getAttribute('placeholder')) elementData['placeholder'] = el.getAttribute('placeholder');\n" +
+                "    if (el.getAttribute('alt')) elementData['alt'] = el.getAttribute('alt');\n" +
+                "    if (Object.keys(elementData).length > 0) elements.push(elementData);\n" +
+                "  });\n" +
+                "  return elements;\n" +
+                "}");
+
+        int counter = 1;
+        for (Map<String, String> element : elements) {
+            String name = "element" + counter++;
+            addLocatorFromAttributes(name, element);
+        }
     }
 
-    public void addXpathLocator(String name, String xpath) {
-        locators.put(name, page.locator(xpath));
+    // Method to add locator based on available attributes
+    private void addLocatorFromAttributes(String name, Map<String, String> attributes) {
+        if (attributes.containsKey("css")) {
+            locators.put(name, page.locator(attributes.get("css")));
+        } else if (attributes.containsKey("text")) {
+            locators.put(name, page.getByText(attributes.get("text")));
+        } else if (attributes.containsKey("role")) {
+            locators.put(name, page.getByRole(attributes.get("role")));
+        } else if (attributes.containsKey("placeholder")) {
+            locators.put(name, page.getByPlaceholder(attributes.get("placeholder")));
+        } else if (attributes.containsKey("alt")) {
+            locators.put(name, page.getByAltText(attributes.get("alt")));
+        } else if (attributes.containsKey("tag")) {
+            locators.put(name, page.locator(attributes.get("tag")));
+        }
     }
 
-    public void addTextLocator(String name, String text) {
-        locators.put(name, page.getByText(text));
-    }
-
-    public void addAltTextLocator(String name, String altText) {
-        locators.put(name, page.getByAltText(altText));
-    }
-
-    public void addPlaceholderLocator(String name, String placeholder) {
-        locators.put(name, page.getByPlaceholder(placeholder));
-    }
-
-    public void addRoleLocator(String name, String role, Map<String, String> attributes) {
-        locators.put(name, page.getByRole(role, new Page.GetByRoleOptions().setAttributes(attributes)));
-    }
-
-    public void addLabelLocator(String name, String label) {
-        locators.put(name, page.getByLabel(label));
-    }
-
-    public Locator getLocator(String name) {
-        return locators.get(name);
-    }
-
-    // Method to list all locators added with their type
+    // Method to list all locators with their types
     public void listAllLocators() {
         locators.forEach((name, locator) -> {
-            System.out.println("Locator name: " + name + ", Locator type: " + getLocatorType(locator));
+            System.out.println("Locator name: " + name + ", Locator: " + locator.toString());
         });
     }
 
-    // Helper method to determine the locator type
-    private String getLocatorType(Locator locator) {
-        // This is a placeholder; you can add logic to differentiate locator types based on how they were added
-        return locator.toString();
+    // Method to get a specific locator by name
+    public Locator getLocator(String name) {
+        return locators.get(name);
     }
 }
