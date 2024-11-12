@@ -19,12 +19,13 @@ public class LocatorManager {
 
     // Method to read the DOM and generate locators dynamically
     private void generateLocatorsFromDOM() {
+        // Enhanced JavaScript snippet to reliably capture element attributes
         List<Map<String, String>> elements = page.evaluate("() => {\n" +
                 "  const elements = [];\n" +
                 "  document.querySelectorAll('*').forEach(el => {\n" +
                 "    const elementData = {};\n" +
                 "    if (el.id) elementData['css'] = `#${el.id}`;\n" +
-                "    if (el.className) elementData['css'] = `.${el.className.split(' ').join('.')}`;\n" +
+                "    if (el.className && el.className.trim()) elementData['css'] = `.${el.className.trim().replace(/\\s+/g, '.')}`;\n" +
                 "    if (el.tagName) elementData['tag'] = el.tagName.toLowerCase();\n" +
                 "    if (el.textContent && el.textContent.trim().length < 30) elementData['text'] = el.textContent.trim();\n" +
                 "    if (el.getAttribute('role')) elementData['role'] = el.getAttribute('role');\n" +
@@ -35,6 +36,7 @@ public class LocatorManager {
                 "  return elements;\n" +
                 "}");
 
+        // Populate locators map with identified elements
         int counter = 1;
         for (Map<String, String> element : elements) {
             String name = "element" + counter++;
