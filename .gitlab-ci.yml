@@ -1,0 +1,44 @@
+stages:
+  - install
+  - test
+  - report
+
+variables:
+  MAVEN_CLI_OPTS: "--batch-mode --errors --fail-at-end"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
+  TEST_TAG: "@smoke"                     # Default tag; change as needed
+  ENVIRONMENT: "qa"                       # Default environment; change as needed
+  EMAIL_RECIPIENT: "test@example.com"     # Default email; change as needed
+
+install_dependencies:
+  stage: install
+  script:
+    - if [ "$BUILD_TOOL" == "maven" ]; then mvn clean install $MAVEN_CLI_OPTS -DskipTests; else ./gradlew build -x test; fi
+
+run_tests:
+  stage: test
+  script:
+    - if [ "$BUILD_TOOL" == "maven" ]; then mvn test $MAVEN_CLI_OPTS -Dcucumber.filter.tags=${TEST_TAG} -Denv=${ENVIRONMENT}; else ./gradlew test -Pcucumber.filter.tags=${TEST_TAG} -Penv=${ENVIRONMENT}; fi
+  artifacts:
+    paths:
+      - test-reports/
+
+generate_reports:
+  stage: report
+  script:
+    - mkdir -p test-reports/
+    - cp target/site/extent-reports/index.html test-reports/index.html || true
+  artifacts:
+    paths:
+      - test-reports/
+    expire_in: 1 day
+
+email_report:
+  stage: report
+  script:
+    - |
+      echo "Sending report to ${EMAIL_RECIPIENT}"
+      echo "Test report for tag: ${TEST_TAG}, Environment: ${ENVIRONMENT}" | \
+      mail -s "Test Report - ${ENVIRONMENT} - ${TEST_TAG}" -A test-reports/index.html ${EMAIL_RECIPIENT}
+  only:
+    - master

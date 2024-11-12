@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.example'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Cucumber dependencies
+    testImplementation 'io.cucumber:cucumber-java:7.2.3'
+    testImplementation 'io.cucumber:cucumber-junit:7.2.3'
+
+    // Playwright dependency
+    implementation 'com.microsoft.playwright:playwright:1.30.0'
+
+    // Extent Reports
+    implementation 'com.aventstack:extentreports:5.0.9'
+
+    // JUnit
+    testImplementation 'junit:junit:4.13.2'
+}
+
+test {
+    useJUnit()
+}

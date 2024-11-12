@@ -1,0 +1,74 @@
+pipeline {
+    agent any
+    parameters {
+        choice(name: 'BUILD_TOOL', choices: ['maven', 'gradle'], description: 'Select build tool')
+        choice(name: 'TEST_TAG', choices: ['@smoke', '@regression', '@api', '@accessibility'], description: 'Select test tag')
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'qa', 'staging', 'production'], description: 'Select environment')
+        string(name: 'EMAIL_RECIPIENT', defaultValue: 'test@example.com', description: 'Email to send test report')
+    }
+    environment {
+        REPORT_DIR = "test-reports"
+    }
+    stages {
+        stage('Install Dependencies') {
+            steps {
+                script {
+                    if (params.BUILD_TOOL == 'maven') {
+                        sh 'mvn clean install -DskipTests'
+                    } else {
+                        sh './gradlew build -x test'
+                    }
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                script {
+                    if (params.BUILD_TOOL == 'maven') {
+                        sh "mvn test -Dcucumber.filter.tags=${params.TEST_TAG} -Denv=${params.ENVIRONMENT}"
+                    } else {
+                        sh "./gradlew test -Pcucumber.filter.tags=${params.TEST_TAG} -Penv=${params.ENVIRONMENT}"
+                    }
+                }
+            }
+        }
+
+        stage('Generate Reports') {
+            steps {
+                script {
+                    if (fileExists("${REPORT_DIR}/index.html")) {
+                        archiveArtifacts "${REPORT_DIR}/**"
+                        publishHTML([allowMissing: false,
+                                     keepAll: true,
+                                     reportDir: "${REPORT_DIR}",
+                                     reportFiles: 'index.html',
+                                     reportName: 'Test Report'])
+                    } else {
+                        echo 'Report not found!'
+                    }
+                }
+            }
+        }
+    }
+    post {
+        always {
+            junit '**/test-reports/*.xml'
+            cleanWs()
+        }
+        success {
+            mail bcc: '', body: "Test report is attached.\nEnvironment: ${params.ENVIRONMENT}\nTag: ${params.TEST_TAG}",
+                 from: 'jenkins@yourcompany.com',
+                 replyTo: 'jenkins@yourcompany.com',
+                 subject: "Test Report - ${params.ENVIRONMENT} - ${params.TEST_TAG}",
+                 to: "${params.EMAIL_RECIPIENT}"
+        }
+        failure {
+            mail bcc: '', body: "Test failed.\nEnvironment: ${params.ENVIRONMENT}\nTag: ${params.TEST_TAG}",
+                 from: 'jenkins@yourcompany.com',
+                 replyTo: 'jenkins@yourcompany.com',
+                 subject: "Test Failure - ${params.ENVIRONMENT} - ${params.TEST_TAG}",
+                 to: "${params.EMAIL_RECIPIENT}"
+        }
+    }
+}
